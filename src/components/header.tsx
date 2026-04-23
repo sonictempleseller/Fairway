@@ -8,8 +8,8 @@ export default function Header() {
           Fairway
         </Link>
         <nav className="flex gap-6 text-sm font-medium text-muted-foreground">
-          <Link href="/" className="hover:text-foreground transition-colors">
-            Home
+          <Link href="/dashboard" className="hover:text-foreground transition-colors">
+            Dashboard
           </Link>
           <Link href="/students" className="hover:text-foreground transition-colors">
             Students

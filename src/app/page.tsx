@@ -23,7 +23,7 @@ export default async function Home() {
           className="absolute inset-0 -z-10 opacity-[0.04] [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:40px_40px]"
         />
 
-        <div className="mx-auto max-w-6xl px-6 py-24 sm:py-32 lg:py-40">
+        <div className="mx-auto w-full max-w-6xl px-6 py-24 sm:py-32 lg:py-40">
           {/* Eyebrow badge */}
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/70 bg-emerald-50/80 px-3 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
             <span className="size-1.5 rounded-full bg-emerald-500" />
@@ -83,7 +83,7 @@ export default async function Home() {
       </section>
 
       {/* CTA strip */}
-      <section className="mx-auto max-w-6xl px-6 pb-24">
+      <section className="mx-auto w-full max-w-6xl px-6 pb-24">
         <div className="rounded-2xl border border-border bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-10 sm:p-14 text-center">
           <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Spend more time coaching.

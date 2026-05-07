@@ -2,7 +2,7 @@
 
 // Server Actions for managing lessons. Inserts / deletes here trigger the
 // on_lesson_change DB trigger which keeps students.total_lessons and
-// students.last_lesson_at in sync automatically.
+// students.last_lesson_at in sync (logged lessons only).
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -17,17 +17,28 @@ function errorMessage(err: unknown): string {
 
 export async function createLesson(formData: FormData) {
   const studentId = String(formData.get("student_id") ?? "");
-  const occurredAtRaw = String(formData.get("occurred_at") ?? "").trim();
+  const occurredAtIso = String(formData.get("occurred_at") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
+  const statusRaw = String(formData.get("status") ?? "scheduled");
+  const status = statusRaw === "logged" ? "logged" : "scheduled";
+
+  const durationRaw = String(formData.get("duration_minutes") ?? "60");
+  const duration = Math.max(1, Math.min(600, Number.parseInt(durationRaw, 10) || 60));
+
+  // Where to redirect on error: scheduling flow → /lessons/new, log flow →
+  // student profile.
+  const errorBack =
+    status === "scheduled"
+      ? "/lessons/new"
+      : studentId
+        ? `/students/${studentId}`
+        : "/students";
 
   if (!studentId) {
-    redirect("/students");
+    redirect("/lessons/new?error=" + encodeURIComponent("Please pick a student"));
   }
-
-  const back = `/students/${studentId}`;
-
-  if (!occurredAtRaw) {
-    redirect(`${back}?error=` + encodeURIComponent("Lesson date is required"));
+  if (!occurredAtIso) {
+    redirect(`${errorBack}?error=` + encodeURIComponent("Date and time are required"));
   }
 
   const supabase = await createClient();
@@ -36,34 +47,40 @@ export async function createLesson(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // <input type="date"> gives YYYY-MM-DD; Postgres can cast that to timestamptz.
   const { error } = await supabase.from("lessons").insert({
     student_id: studentId,
     coach_id: user.id,
-    occurred_at: occurredAtRaw,
+    occurred_at: occurredAtIso,
+    duration_minutes: duration,
+    status,
     notes: notes || null,
   });
 
   if (error) {
-    redirect(`${back}?error=` + encodeURIComponent(errorMessage(error)));
+    redirect(`${errorBack}?error=` + encodeURIComponent(errorMessage(error)));
   }
 
-  revalidatePath(back);
+  revalidatePath(`/students/${studentId}`);
   revalidatePath("/students");
   revalidatePath("/dashboard");
-  redirect(back);
+  revalidatePath("/calendar");
+
+  // After scheduling → return to the calendar so the new block is visible.
+  // After logging   → return to the student profile so the new entry shows up.
+  redirect(status === "scheduled" ? "/calendar" : `/students/${studentId}`);
 }
 
 export async function deleteLesson(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const studentId = String(formData.get("student_id") ?? "");
-  if (!id || !studentId) redirect("/students");
+  if (!id) redirect("/students");
 
   const supabase = await createClient();
   await supabase.from("lessons").delete().eq("id", id);
 
-  revalidatePath(`/students/${studentId}`);
   revalidatePath("/students");
   revalidatePath("/dashboard");
-  redirect(`/students/${studentId}`);
+  revalidatePath("/calendar");
+  if (studentId) revalidatePath(`/students/${studentId}`);
+  redirect(studentId ? `/students/${studentId}` : "/calendar");
 }

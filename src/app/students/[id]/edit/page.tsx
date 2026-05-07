@@ -27,7 +27,7 @@ export default async function EditStudentPage({
   if (!student) notFound();
 
   return (
-    <main className="mx-auto max-w-md px-6 py-10">
+    <main className="mx-auto w-full max-w-md px-6 py-10">
       <div className="mb-6">
         <Link href={`/students/${student.id}`} className="text-sm text-muted-foreground hover:text-foreground">
           ← Back to {student.name}

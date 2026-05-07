@@ -41,6 +41,9 @@ export default async function Header() {
               <Link href="/students" className="hover:text-foreground transition-colors">
                 Students
               </Link>
+              <Link href="/calendar" className="hover:text-foreground transition-colors">
+                Calendar
+              </Link>
               <Link href="/settings" className="hover:text-foreground transition-colors hidden sm:inline">
                 Settings
               </Link>

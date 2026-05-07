@@ -11,6 +11,8 @@ type LessonRow = {
   student_id: string;
   coach_id: string;
   occurred_at: string;
+  duration_minutes: number;
+  status: string;
   notes: string | null;
   created_at: string;
 };
@@ -35,11 +37,21 @@ export async function GET() {
     return new Response(`Failed to load lessons: ${error.message}`, { status: 500 });
   }
 
-  const headers = ["id", "student_id", "occurred_at", "notes", "created_at"];
+  const headers = [
+    "id",
+    "student_id",
+    "occurred_at",
+    "duration_minutes",
+    "status",
+    "notes",
+    "created_at",
+  ];
   const rows = (lessons ?? []).map((l) => [
     l.id,
     l.student_id,
     l.occurred_at,
+    l.duration_minutes,
+    l.status,
     l.notes ?? "",
     l.created_at,
   ]);

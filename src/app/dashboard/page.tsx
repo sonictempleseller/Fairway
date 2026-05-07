@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { type Student } from "@/lib/students";
-import { type Lesson, formatLessonOccurredAt } from "@/lib/lessons";
+import { type Lesson, formatLessonOccurredAt, formatLessonTime } from "@/lib/lessons";
 
 type ProfileRow = { display_name: string | null };
 
@@ -15,35 +15,47 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Load profile, students, and recent lessons in parallel.
-  const [profileRes, studentsRes, lessonsRes] = await Promise.all([
+  const nowIso = new Date().toISOString();
+
+  // Load profile, students, recent (logged) lessons, and upcoming (scheduled) in parallel.
+  const [profileRes, studentsRes, recentRes, upcomingRes] = await Promise.all([
     supabase.from("profiles").select("display_name").eq("id", user!.id).maybeSingle<ProfileRow>(),
     supabase.from("students").select("*").returns<Student[]>(),
     supabase
       .from("lessons")
       .select("*, student:students(id, name, handicap)")
+      .eq("status", "logged")
       .order("occurred_at", { ascending: false })
+      .limit(4)
+      .returns<RecentLessonRow[]>(),
+    supabase
+      .from("lessons")
+      .select("*, student:students(id, name, handicap)")
+      .eq("status", "scheduled")
+      .gte("occurred_at", nowIso)
+      .order("occurred_at", { ascending: true })
       .limit(4)
       .returns<RecentLessonRow[]>(),
   ]);
 
   if (studentsRes.error) {
     return (
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto w-full max-w-6xl px-6 py-10">
         <p className="text-destructive">Could not load dashboard: {studentsRes.error.message}</p>
       </main>
     );
   }
 
   const list = studentsRes.data ?? [];
-  const recentLessons = lessonsRes.data ?? [];
+  const recentLessons = recentRes.data ?? [];
+  const upcomingLessons = upcomingRes.data ?? [];
   const displayName = profileRes.data?.display_name?.trim();
   const greetingName = displayName || user?.email?.split("@")[0] || "Coach";
 
   // Empty state — first-time user, no students yet.
   if (list.length === 0) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto w-full max-w-3xl px-6 py-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
           <p className="mt-1 text-muted-foreground">Welcome to Fairway, {greetingName}.</p>
@@ -79,7 +91,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto w-full max-w-6xl px-6 py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
         <p className="mt-1 text-muted-foreground">Welcome back, {greetingName}</p>
@@ -97,7 +109,39 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent lessons */}
+      {/* Upcoming (scheduled) */}
+      {upcomingLessons.length > 0 && (
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">Upcoming</h2>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/calendar">Calendar</Link>
+            </Button>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {upcomingLessons.map((lesson) => (
+              <Link
+                key={lesson.id}
+                href={lesson.student ? `/students/${lesson.student.id}` : "/students"}
+                className="group"
+              >
+                <Card className="border border-emerald-300 dark:border-emerald-900 transition-colors group-hover:bg-emerald-50/40">
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      {lesson.student?.name ?? "Unknown student"}
+                    </CardTitle>
+                    <CardDescription>
+                      {formatLessonOccurredAt(lesson.occurred_at)} · {formatLessonTime(lesson.occurred_at)}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent lessons (logged) */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold tracking-tight text-foreground">Recent lessons</h2>
         <Button variant="outline" size="sm" asChild>

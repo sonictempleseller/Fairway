@@ -14,7 +14,7 @@ export default async function StudentsPage() {
 
   if (error) {
     return (
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto w-full max-w-6xl px-6 py-10">
         <p className="text-destructive">Could not load students: {error.message}</p>
       </main>
     );
@@ -23,7 +23,7 @@ export default async function StudentsPage() {
   const list = students ?? [];
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto w-full max-w-6xl px-6 py-10">
       <div className="mb-8 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Students</h1>

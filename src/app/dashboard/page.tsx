@@ -29,7 +29,7 @@ export default async function DashboardPage() {
 
   if (studentsRes.error) {
     return (
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-6 py-10">
         <p className="text-destructive">Could not load dashboard: {studentsRes.error.message}</p>
       </main>
     );
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="mx-auto max-w-6xl px-6 py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
         <p className="mt-1 text-muted-foreground">Welcome back, {greetingName}</p>

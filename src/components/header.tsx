@@ -27,7 +27,7 @@ export default async function Header() {
 
   return (
     <header className="border-b bg-background">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4 gap-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 gap-4">
         <Link href="/" className="text-xl font-bold tracking-tight text-foreground">
           Fairway
         </Link>

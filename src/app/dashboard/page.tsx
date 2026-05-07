@@ -119,6 +119,22 @@ export default async function DashboardPage() {
           ))}
         </div>
       )}
+
+      {/* Export — downloads CSV files of your data */}
+      <div className="mt-12">
+        <h2 className="text-xl font-semibold tracking-tight text-foreground mb-1">Export data</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Download your data as a spreadsheet. One file per type.
+        </p>
+        <div className="flex gap-3 flex-wrap">
+          <Button variant="outline" asChild>
+            <a href="/api/export/students" download>Export students.csv</a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/api/export/lessons" download>Export lessons.csv</a>
+          </Button>
+        </div>
+      </div>
     </main>
   );
 }

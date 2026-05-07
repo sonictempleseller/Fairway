@@ -11,16 +11,31 @@
 //      getUser is required for any authorization check)
 //   3. Redirects unauthenticated visitors away from protected routes
 //   4. Redirects already-signed-in visitors away from /login and /signup
-//   5. Writes any updated cookies onto the outgoing response
+//   5. Routes between coach (/dashboard) and student (/me) home pages by user_type
+//   6. Writes any updated cookies onto the outgoing response
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Routes that require a signed-in user. Anything not listed here is public
-// (homepage, login, signup, static assets, etc.).
-const PROTECTED_PREFIXES = ["/dashboard", "/students", "/calendar", "/lessons", "/settings"];
+// Routes that require a signed-in user (any user_type). Settings is shared.
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/students",
+  "/calendar",
+  "/lessons",
+  "/settings",
+  "/me",
+];
 
-// Routes that are pointless to show a signed-in user. We bounce them to /dashboard.
+// Routes that only coaches should access. Students hitting these get bounced
+// to /me.
+const COACH_ONLY_PREFIXES = ["/dashboard", "/students", "/calendar", "/lessons"];
+
+// Routes only students should access. Coaches hitting these get bounced to
+// /dashboard.
+const STUDENT_ONLY_PREFIXES = ["/me"];
+
+// Routes that are pointless to show a signed-in user.
 const SIGNED_IN_REDIRECT_AWAY_FROM = ["/login", "/signup"];
 
 export async function updateSession(request: NextRequest) {
@@ -65,9 +80,40 @@ export async function updateSession(request: NextRequest) {
   // Bounce signed-in users away from auth pages.
   if (user && SIGNED_IN_REDIRECT_AWAY_FROM.some((p) => pathname.startsWith(p))) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/dashboard"; // /dashboard handler will further redirect students -> /me
     url.search = "";
     return NextResponse.redirect(url);
+  }
+
+  // Role-aware routing. We need to know the user's role to redirect, but
+  // calling Supabase here makes proxy slow. We fetch user_type lazily —
+  // only when the path is one of the role-gated prefixes.
+  if (user) {
+    const isCoachOnly = COACH_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
+    const isStudentOnly = STUDENT_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
+
+    if (isCoachOnly || isStudentOnly) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_type")
+        .eq("id", user.id)
+        .maybeSingle<{ user_type: string }>();
+
+      const role = profile?.user_type ?? "coach";
+
+      if (isCoachOnly && role === "student") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/me";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+      if (isStudentOnly && role === "coach") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
   }
 
   return response;

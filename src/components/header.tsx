@@ -4,28 +4,34 @@ import { signout } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/avatar";
 
-type ProfileRow = { display_name: string | null; avatar_url: string | null };
+type ProfileRow = {
+  display_name: string | null;
+  avatar_url: string | null;
+  user_type: "coach" | "student";
+};
 
-// Async Server Component — calls Supabase to find out who is signed in
-// and what their preferred display name and avatar are.
+// Async Server Component — calls Supabase to find out who is signed in,
+// what their preferred display name and avatar are, and which user type
+// they have so we can render the right nav.
 export default async function Header() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let displayName: string | null = null;
-  let avatarUrl: string | null = null;
+  let profile: ProfileRow | null = null;
   if (user) {
     const { data } = await supabase
       .from("profiles")
-      .select("display_name, avatar_url")
+      .select("display_name, avatar_url, user_type")
       .eq("id", user.id)
       .maybeSingle<ProfileRow>();
-    displayName = data?.display_name?.trim() || null;
-    avatarUrl = data?.avatar_url || null;
+    profile = data ?? null;
   }
 
+  const displayName = profile?.display_name?.trim() || null;
+  const avatarUrl = profile?.avatar_url || null;
+  const userType = profile?.user_type ?? "coach";
   const headerLabel = displayName || user?.email || "";
 
   return (
@@ -38,15 +44,23 @@ export default async function Header() {
         <nav className="flex items-center gap-4 sm:gap-6 text-sm font-medium text-muted-foreground">
           {user ? (
             <>
-              <Link href="/dashboard" className="hover:text-foreground transition-colors">
-                Dashboard
-              </Link>
-              <Link href="/students" className="hover:text-foreground transition-colors">
-                Students
-              </Link>
-              <Link href="/calendar" className="hover:text-foreground transition-colors">
-                Calendar
-              </Link>
+              {userType === "coach" ? (
+                <>
+                  <Link href="/dashboard" className="hover:text-foreground transition-colors">
+                    Dashboard
+                  </Link>
+                  <Link href="/students" className="hover:text-foreground transition-colors">
+                    Students
+                  </Link>
+                  <Link href="/calendar" className="hover:text-foreground transition-colors">
+                    Calendar
+                  </Link>
+                </>
+              ) : (
+                <Link href="/me" className="hover:text-foreground transition-colors">
+                  My lessons
+                </Link>
+              )}
               <Link
                 href="/settings"
                 className="hidden sm:flex items-center gap-2 hover:text-foreground transition-colors"

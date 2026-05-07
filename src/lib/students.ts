@@ -4,6 +4,7 @@
 export type Student = {
   id: string;
   coach_id: string;
+  user_id: string | null; // set when an invitation is redeemed
   name: string;
   handicap: number;
   total_lessons: number;

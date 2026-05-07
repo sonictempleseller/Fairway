@@ -1,14 +1,34 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { CopyButton } from "@/components/copy-button";
 import { LessonForm } from "@/components/lesson-form";
 import { createClient } from "@/lib/supabase/server";
 import { type Student, handicapLabel, formatLessonDate } from "@/lib/students";
 import { type Lesson, formatLessonOccurredAt, formatLessonTime } from "@/lib/lessons";
 import { deleteStudent } from "@/app/actions/students";
 import { createLesson, deleteLesson } from "@/app/actions/lessons";
+import { createInvitation, revokeInvitation } from "@/app/actions/invitations";
+
+type Invitation = {
+  id: string;
+  token: string;
+  email: string | null;
+  expires_at: string;
+  redeemed_at: string | null;
+  created_at: string;
+};
+
+async function buildBaseUrl(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3001";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
 
 export default async function StudentProfilePage({
   params,
@@ -22,7 +42,7 @@ export default async function StudentProfilePage({
 
   const supabase = await createClient();
 
-  const [studentRes, lessonsRes] = await Promise.all([
+  const [studentRes, lessonsRes, invitesRes, baseUrl] = await Promise.all([
     supabase.from("students").select("*").eq("id", id).maybeSingle<Student>(),
     supabase
       .from("lessons")
@@ -30,6 +50,13 @@ export default async function StudentProfilePage({
       .eq("student_id", id)
       .order("occurred_at", { ascending: false })
       .returns<Lesson[]>(),
+    supabase
+      .from("student_invitations")
+      .select("id, token, email, expires_at, redeemed_at, created_at")
+      .eq("student_id", id)
+      .order("created_at", { ascending: false })
+      .returns<Invitation[]>(),
+    buildBaseUrl(),
   ]);
 
   if (studentRes.error) {
@@ -43,11 +70,19 @@ export default async function StudentProfilePage({
 
   const student = studentRes.data;
   const lessons = lessonsRes.data ?? [];
+  const invitations = invitesRes.data ?? [];
   const nowIso = new Date().toISOString();
   const upcoming = lessons
     .filter((l) => l.status === "scheduled" && l.occurred_at >= nowIso)
     .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
   const history = lessons.filter((l) => l.status === "logged");
+
+  // Active = not redeemed and not expired.
+  const activeInvitation = invitations.find(
+    (inv) => inv.redeemed_at === null && inv.expires_at > nowIso,
+  );
+  // Defensive: treat null, undefined, empty string all as "not linked".
+  const isLinked = typeof student.user_id === "string" && student.user_id.length > 0;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-10">
@@ -193,6 +228,61 @@ export default async function StudentProfilePage({
               <CardTitle className="text-xl">{formatLessonDate(student.last_lesson_at)}</CardTitle>
               <CardDescription>Last lesson</CardDescription>
             </CardHeader>
+          </Card>
+
+          {/* Invite to Fairway */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Invite to Fairway</CardTitle>
+              <CardDescription>
+                {isLinked
+                  ? "This student has joined Fairway. They can sign in and see their lessons."
+                  : "Send a link so they can claim their account and see lessons, homework, and chat with you."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {isLinked ? (
+                <p className="text-sm text-muted-foreground">✓ Linked.</p>
+              ) : activeInvitation ? (
+                <>
+                  <div className="text-xs text-muted-foreground">
+                    Expires {new Date(activeInvitation.expires_at).toLocaleDateString()}
+                  </div>
+                  <Input
+                    readOnly
+                    value={`${baseUrl}/invite/${activeInvitation.token}`}
+                    className="text-xs"
+                  />
+                  <div className="flex gap-2 flex-wrap">
+                    <CopyButton value={`${baseUrl}/invite/${activeInvitation.token}`} />
+                    <form action={revokeInvitation}>
+                      <input type="hidden" name="id" value={activeInvitation.id} />
+                      <input type="hidden" name="student_id" value={student.id} />
+                      <ConfirmSubmitButton
+                        message="Revoke this invitation? The link will stop working."
+                        variant="ghost"
+                        size="sm"
+                      >
+                        Revoke
+                      </ConfirmSubmitButton>
+                    </form>
+                  </div>
+                </>
+              ) : (
+                <form action={createInvitation} className="flex flex-col gap-3">
+                  <input type="hidden" name="student_id" value={student.id} />
+                  <Input
+                    name="email"
+                    type="email"
+                    placeholder="Their email (optional, for your records)"
+                    className="text-sm"
+                  />
+                  <Button type="submit" size="sm" className="self-start bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Generate invite link
+                  </Button>
+                </form>
+              )}
+            </CardContent>
           </Card>
 
           <Card>

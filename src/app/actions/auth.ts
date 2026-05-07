@@ -67,3 +67,50 @@ export async function signout() {
   revalidatePath("/", "layout");
   redirect("/");
 }
+
+// Student-side signup. Same shape as signup() above but tags the user as
+// a 'student' in their profile (via raw_user_meta_data.user_type) and
+// redeems the invitation token immediately afterwards so the auth user is
+// linked to the coach's roster row.
+export async function signupWithInvite(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const token = String(formData.get("invite_token") ?? "").trim();
+
+  const back = `/invite/${token}`;
+
+  if (!token) {
+    redirect("/?error=" + encodeURIComponent("Missing invitation token"));
+  }
+  if (!email || !password) {
+    redirect(`${back}?error=` + encodeURIComponent("Email and password are required"));
+  }
+  if (password.length < 6) {
+    redirect(`${back}?error=` + encodeURIComponent("Password must be at least 6 characters"));
+  }
+
+  const supabase = await createClient();
+  const { error: signUpErr } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { user_type: "student" } },
+  });
+
+  if (signUpErr) {
+    redirect(`${back}?error=` + encodeURIComponent(errorMessage(signUpErr)));
+  }
+
+  // The signup just established a session. Use it to redeem the invite.
+  const { error: rpcErr } = await supabase.rpc("redeem_invitation", {
+    invite_token: token,
+  });
+
+  if (rpcErr) {
+    // The student is now signed up but unlinked. Surface the error so they
+    // can ask the coach for a fresh invite — their account still exists.
+    redirect(`${back}?error=` + encodeURIComponent(errorMessage(rpcErr)));
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/me");
+}

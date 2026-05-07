@@ -2,7 +2,12 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { type Student, handicapLabel, formatLessonDate } from "@/lib/students";
+import { type Student } from "@/lib/students";
+import { type Lesson, formatLessonOccurredAt } from "@/lib/lessons";
+
+type ProfileRow = { display_name: string | null };
+
+type RecentLessonRow = Lesson & { student: { id: string; name: string; handicap: number } | null };
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -10,20 +15,30 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: students, error } = await supabase
-    .from("students")
-    .select("*")
-    .returns<Student[]>();
+  // Load profile, students, and recent lessons in parallel.
+  const [profileRes, studentsRes, lessonsRes] = await Promise.all([
+    supabase.from("profiles").select("display_name").eq("id", user!.id).maybeSingle<ProfileRow>(),
+    supabase.from("students").select("*").returns<Student[]>(),
+    supabase
+      .from("lessons")
+      .select("*, student:students(id, name, handicap)")
+      .order("occurred_at", { ascending: false })
+      .limit(4)
+      .returns<RecentLessonRow[]>(),
+  ]);
 
-  if (error) {
+  if (studentsRes.error) {
     return (
       <main className="mx-auto max-w-5xl px-6 py-10">
-        <p className="text-destructive">Could not load dashboard: {error.message}</p>
+        <p className="text-destructive">Could not load dashboard: {studentsRes.error.message}</p>
       </main>
     );
   }
 
-  const list = students ?? [];
+  const list = studentsRes.data ?? [];
+  const recentLessons = lessonsRes.data ?? [];
+  const displayName = profileRes.data?.display_name?.trim();
+  const greetingName = displayName || user?.email?.split("@")[0] || "Coach";
 
   // Empty state — first-time user, no students yet.
   if (list.length === 0) {
@@ -31,7 +46,7 @@ export default async function DashboardPage() {
       <main className="mx-auto max-w-3xl px-6 py-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-          <p className="mt-1 text-muted-foreground">Welcome to Fairway{user?.email ? "" : ""}.</p>
+          <p className="mt-1 text-muted-foreground">Welcome to Fairway, {greetingName}.</p>
         </div>
 
         <Card>
@@ -51,15 +66,11 @@ export default async function DashboardPage() {
     );
   }
 
-  // Compute stats from real data.
+  // Stats from real data.
   const totalLessons = list.reduce((sum, s) => sum + s.total_lessons, 0);
   const avgHandicap = Math.round(
     list.reduce((sum, s) => sum + s.handicap, 0) / list.length,
   );
-  const recentStudents = [...list]
-    .filter((s) => s.last_lesson_at !== null)
-    .sort((a, b) => (b.last_lesson_at ?? "").localeCompare(a.last_lesson_at ?? ""))
-    .slice(0, 4);
 
   const stats = [
     { label: "Total students", value: list.length },
@@ -71,7 +82,7 @@ export default async function DashboardPage() {
     <main className="mx-auto max-w-5xl px-6 py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">Welcome back, Coach</p>
+        <p className="mt-1 text-muted-foreground">Welcome back, {greetingName}</p>
       </div>
 
       {/* Stats row */}
@@ -94,28 +105,38 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
-      {recentStudents.length === 0 ? (
+      {recentLessons.length === 0 ? (
         <Card>
           <CardHeader>
             <CardDescription>
-              No lessons logged yet. Lesson tracking is coming soon.
+              No lessons logged yet. Open a student&apos;s profile to log one.
             </CardDescription>
           </CardHeader>
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {recentStudents.map((student) => (
-            <Card key={student.id}>
-              <CardHeader>
-                <CardTitle>{student.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground flex flex-col gap-1">
-                <span>
-                  {handicapLabel(student.handicap)} · Handicap {student.handicap}
-                </span>
-                <span>Last lesson: {formatLessonDate(student.last_lesson_at)}</span>
-              </CardContent>
-            </Card>
+          {recentLessons.map((lesson) => (
+            <Link
+              key={lesson.id}
+              href={lesson.student ? `/students/${lesson.student.id}` : "/students"}
+              className="group"
+            >
+              <Card className="transition-colors group-hover:bg-muted/40">
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {lesson.student?.name ?? "Unknown student"}
+                  </CardTitle>
+                  <CardDescription>
+                    {formatLessonOccurredAt(lesson.occurred_at)}
+                  </CardDescription>
+                </CardHeader>
+                {lesson.notes && (
+                  <CardContent className="text-sm text-muted-foreground line-clamp-2">
+                    {lesson.notes}
+                  </CardContent>
+                )}
+              </Card>
+            </Link>
           ))}
         </div>
       )}

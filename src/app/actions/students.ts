@@ -50,6 +50,38 @@ export async function createStudent(formData: FormData) {
   redirect("/students");
 }
 
+export async function updateStudent(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const handicapRaw = String(formData.get("handicap") ?? "").trim();
+  const handicap = Number.parseInt(handicapRaw, 10);
+
+  if (!id) redirect("/students");
+  const back = `/students/${id}/edit`;
+
+  if (!name) {
+    redirect(`${back}?error=` + encodeURIComponent("Name is required"));
+  }
+  if (Number.isNaN(handicap) || handicap < 0 || handicap > 54) {
+    redirect(`${back}?error=` + encodeURIComponent("Handicap must be a number between 0 and 54"));
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("students")
+    .update({ name, handicap })
+    .eq("id", id);
+
+  if (error) {
+    redirect(`${back}?error=` + encodeURIComponent(errorMessage(error)));
+  }
+
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/students");
+  revalidatePath("/dashboard");
+  redirect(`/students/${id}`);
+}
+
 export async function deleteStudent(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) {

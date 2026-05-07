@@ -3,12 +3,27 @@ import { createClient } from "@/lib/supabase/server";
 import { signout } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 
-// Async Server Component — calls Supabase to find out who is signed in.
+type ProfileRow = { display_name: string | null };
+
+// Async Server Component — calls Supabase to find out who is signed in
+// and what their preferred display name is.
 export default async function Header() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  let displayName: string | null = null;
+  if (user) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle<ProfileRow>();
+    displayName = data?.display_name?.trim() || null;
+  }
+
+  const headerLabel = displayName || user?.email || "";
 
   return (
     <header className="border-b bg-background">
@@ -26,8 +41,11 @@ export default async function Header() {
               <Link href="/students" className="hover:text-foreground transition-colors">
                 Students
               </Link>
-              <span className="hidden sm:inline text-foreground/70 truncate max-w-[200px]">
-                {user.email}
+              <Link href="/settings" className="hover:text-foreground transition-colors hidden sm:inline">
+                Settings
+              </Link>
+              <span className="hidden md:inline text-foreground/70 truncate max-w-[200px]">
+                {headerLabel}
               </span>
               <form action={signout}>
                 <Button type="submit" variant="outline" size="sm">

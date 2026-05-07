@@ -18,7 +18,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Routes that require a signed-in user. Anything not listed here is public
 // (homepage, login, signup, static assets, etc.).
-const PROTECTED_PREFIXES = ["/dashboard", "/students"];
+const PROTECTED_PREFIXES = ["/dashboard", "/students", "/settings"];
 
 // Routes that are pointless to show a signed-in user. We bounce them to /dashboard.
 const SIGNED_IN_REDIRECT_AWAY_FROM = ["/login", "/signup"];

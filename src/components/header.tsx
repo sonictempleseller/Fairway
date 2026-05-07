@@ -2,11 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { signout } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/avatar";
 
-type ProfileRow = { display_name: string | null };
+type ProfileRow = { display_name: string | null; avatar_url: string | null };
 
 // Async Server Component — calls Supabase to find out who is signed in
-// and what their preferred display name is.
+// and what their preferred display name and avatar are.
 export default async function Header() {
   const supabase = await createClient();
   const {
@@ -14,13 +15,15 @@ export default async function Header() {
   } = await supabase.auth.getUser();
 
   let displayName: string | null = null;
+  let avatarUrl: string | null = null;
   if (user) {
     const { data } = await supabase
       .from("profiles")
-      .select("display_name")
+      .select("display_name, avatar_url")
       .eq("id", user.id)
       .maybeSingle<ProfileRow>();
     displayName = data?.display_name?.trim() || null;
+    avatarUrl = data?.avatar_url || null;
   }
 
   const headerLabel = displayName || user?.email || "";
@@ -44,12 +47,14 @@ export default async function Header() {
               <Link href="/calendar" className="hover:text-foreground transition-colors">
                 Calendar
               </Link>
-              <Link href="/settings" className="hover:text-foreground transition-colors hidden sm:inline">
-                Settings
+              <Link
+                href="/settings"
+                className="hidden sm:flex items-center gap-2 hover:text-foreground transition-colors"
+                title={headerLabel}
+              >
+                <Avatar src={avatarUrl} name={headerLabel} size="sm" />
+                <span className="hidden md:inline truncate max-w-[160px]">{headerLabel}</span>
               </Link>
-              <span className="hidden md:inline text-foreground/70 truncate max-w-[200px]">
-                {headerLabel}
-              </span>
               <form action={signout}>
                 <Button type="submit" variant="outline" size="sm">
                   Sign out

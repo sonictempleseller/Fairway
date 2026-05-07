@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/avatar";
 import { createClient } from "@/lib/supabase/server";
-import { updateProfile } from "@/app/actions/profile";
+import { updateProfile, uploadAvatar, removeAvatar } from "@/app/actions/profile";
 
-type ProfileRow = { display_name: string | null };
+type ProfileRow = { display_name: string | null; avatar_url: string | null };
 
 export default async function SettingsPage({
   searchParams,
@@ -20,9 +21,13 @@ export default async function SettingsPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name")
+    .select("display_name, avatar_url")
     .eq("id", user!.id)
     .maybeSingle<ProfileRow>();
+
+  const displayName = profile?.display_name ?? "";
+  const avatarUrl = profile?.avatar_url ?? null;
+  const labelName = displayName || user?.email || "";
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
@@ -31,6 +36,37 @@ export default async function SettingsPage({
         <p className="mt-1 text-muted-foreground">Manage your account.</p>
       </div>
 
+      {/* Photo card */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Profile photo</CardTitle>
+          <CardDescription>JPG, PNG, or WebP. 5 MB max.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-6 flex-wrap">
+            <Avatar src={avatarUrl} name={labelName} size="lg" />
+            <div className="flex flex-col gap-3">
+              <form action={uploadAvatar} className="flex items-center gap-3 flex-wrap">
+                <input
+                  type="file"
+                  name="photo"
+                  accept="image/jpeg,image/png,image/webp"
+                  required
+                  className="text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted"
+                />
+                <Button type="submit" size="sm">Upload</Button>
+              </form>
+              {avatarUrl && (
+                <form action={removeAvatar}>
+                  <Button type="submit" variant="ghost" size="sm">Remove photo</Button>
+                </form>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Profile info card */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Profile</CardTitle>
@@ -45,7 +81,7 @@ export default async function SettingsPage({
                 name="display_name"
                 type="text"
                 placeholder="e.g. Coach Kellen"
-                defaultValue={profile?.display_name ?? ""}
+                defaultValue={displayName}
                 maxLength={80}
               />
               <p className="text-xs text-muted-foreground">
